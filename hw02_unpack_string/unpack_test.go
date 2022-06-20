@@ -43,3 +43,32 @@ func TestUnpackInvalidString(t *testing.T) {
 		})
 	}
 }
+
+func Test_validate(t *testing.T) {
+	type args struct {
+		str []rune
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "check success",
+			args:    args{str: []rune("abc3")},
+			wantErr: false,
+		},
+		{
+			name:    "check failed",
+			args:    args{str: []rune("abc34")},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validate(tt.args.str); (err != nil) != tt.wantErr {
+				t.Errorf("validate() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
