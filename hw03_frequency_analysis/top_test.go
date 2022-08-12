@@ -9,7 +9,7 @@ import (
 // Change to true if needed.
 var taskWithAsteriskIsCompleted = false
 
-var text = `Как видите, он  спускается  по  лестнице  вслед  за  своим
+var russianText = `Как видите, он  спускается  по  лестнице  вслед  за  своим
 	другом   Кристофером   Робином,   головой   вниз,  пересчитывая
 	ступеньки собственным затылком:  бум-бум-бум.  Другого  способа
 	сходить  с  лестницы  он  пока  не  знает.  Иногда ему, правда,
@@ -43,12 +43,24 @@ var text = `Как видите, он  спускается  по  лестни�
 	посидеть у огня и послушать какую-нибудь интересную сказку.
 		В этот вечер...`
 
+var englishText = `Is this the real life?
+	Is this just fantasy?
+	Caught in a landside,
+	No escape from reality
+	Open your eyes,
+	Look up to the skies and see,
+	I'm just a poor boy, I need no sympathy,
+	Because I'm easy come, easy go,
+	Little high, little low,
+	Any way the wind blows doesn't really matter to
+	Me, to me`
+
 func TestTop10(t *testing.T) {
 	t.Run("no words in empty string", func(t *testing.T) {
 		require.Len(t, Top10(""), 0)
 	})
 
-	t.Run("positive test", func(t *testing.T) {
+	t.Run("positive test in Russian", func(t *testing.T) {
 		if taskWithAsteriskIsCompleted {
 			expected := []string{
 				"а",         // 8
@@ -62,7 +74,7 @@ func TestTop10(t *testing.T) {
 				"кристофер", // 4
 				"не",        // 4
 			}
-			require.Equal(t, expected, Top10(text))
+			require.Equal(t, expected, Top10(russianText))
 		} else {
 			expected := []string{
 				"он",        // 8
@@ -76,7 +88,23 @@ func TestTop10(t *testing.T) {
 				"не",        // 4
 				"то",        // 4
 			}
-			require.Equal(t, expected, Top10(text))
+			require.Equal(t, expected, Top10(russianText))
 		}
+	})
+
+	t.Run("positive test in English", func(t *testing.T) {
+		expected := []string{
+			"the",
+			"to",
+			"I'm",
+			"Is",
+			"a",
+			"easy",
+			"just",
+			"this",
+			"Any",
+			"Because",
+		}
+		require.Equal(t, expected, Top10(englishText))
 	})
 }
