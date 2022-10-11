@@ -17,7 +17,7 @@ func init() {
 	flag.StringVar(&to, "to", "", "file to write to")
 	flag.Int64Var(&limit, "limit", 0, "limit of bytes to copy")
 	flag.Int64Var(&offset, "offset", 0, "offset in input file")
-	flag.Int64Var(&chunkSize, "chunk-size", 1024, "size of part of file which is copyed simultaneously")
+	flag.Int64Var(&chunkSize, "chunk-size", 1024, "size of part of file which is copied simultaneously")
 }
 
 func main() {

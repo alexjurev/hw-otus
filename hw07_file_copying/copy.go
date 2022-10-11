@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"time"
 
 	"github.com/cheggaaa/pb"
 	"github.com/spf13/afero"
@@ -14,7 +13,7 @@ func closeFile(file afero.File, fromPath string, finError *error) {
 	if file != nil {
 		err := file.Close()
 		if err != nil {
-			*finError = fmt.Errorf("can`t close file %s: %w", fromPath, err)
+			*finError = fmt.Errorf("close file %s: %w", fromPath, err)
 		}
 	}
 }
@@ -32,12 +31,12 @@ func CopyFile(fs afero.Fs, fromPath, toPath string, limit, offset, chunkSize int
 	defer closeFile(src, fromPath, &finError)
 
 	if err != nil {
-		return fmt.Errorf("can`t open file %s: %w", fromPath, err)
+		return fmt.Errorf("open file %s: %w", fromPath, err)
 	}
 
 	fileStats, err := src.Stat()
 	if err != nil {
-		return fmt.Errorf("can`t stat file %s: %w", fromPath, err)
+		return fmt.Errorf("stat file %s: %w", fromPath, err)
 	}
 
 	fileSize := fileStats.Size()
@@ -52,7 +51,7 @@ func CopyFile(fs afero.Fs, fromPath, toPath string, limit, offset, chunkSize int
 	defer closeFile(dst, toPath, &finError)
 
 	if err != nil {
-		return fmt.Errorf("can`t create file %s: %w", toPath, err)
+		return fmt.Errorf("create new file %s: %w", toPath, err)
 	}
 
 	buf := make([]byte, chunkSize)
@@ -64,7 +63,7 @@ func CopyFile(fs afero.Fs, fromPath, toPath string, limit, offset, chunkSize int
 		read, err := src.ReadAt(buf, offset)
 		if !errors.Is(err, io.EOF) && err != nil {
 			bar.Finish()
-			return fmt.Errorf("can`t read from file %s: %w", fromPath, err)
+			return fmt.Errorf("read input file %s: %w", fromPath, err)
 		}
 		if errors.Is(err, io.EOF) {
 			isLastChunk = true
@@ -79,14 +78,13 @@ func CopyFile(fs afero.Fs, fromPath, toPath string, limit, offset, chunkSize int
 
 		if err != nil {
 			bar.Finish()
-			return fmt.Errorf("can`t write to file %s: %w", toPath, err)
+			return fmt.Errorf("write to file %s: %w", toPath, err)
 		}
 
 		offset += int64(read)
 		totalRead += int64(read)
 
 		bar.Increment()
-		time.Sleep(time.Millisecond) // можно поменять на секунду, тогда успеет отобразиться движение прогресс бара
 
 		if isLastChunk {
 			bar.Finish()
