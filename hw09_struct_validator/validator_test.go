@@ -1,7 +1,7 @@
 package hw09structvalidator
 
 import (
-	"errors"
+	"encoding/json"
 	"fmt"
 	"testing"
 
@@ -15,11 +15,11 @@ type (
 	User struct {
 		ID     string `json:"id" validate:"len:36"`
 		Name   string
-		Age    int      `validate:"min:18|max:50"`
-		Email  string   `validate:"regexp:^\\w+@\\w+\\.\\w+$"`
-		Role   UserRole `validate:"in:admin,stuff"`
-		Phones []string `validate:"len:11"`
-		// meta   json.RawMessage
+		Age    int             `validate:"min:18|max:50"`
+		Email  string          `validate:"regexp:^\\w+@\\w+\\.\\w+$"`
+		Role   UserRole        `validate:"in:admin,stuff"`
+		Phones []string        `validate:"len:11"`
+		meta   json.RawMessage //nolint
 	}
 
 	App struct {
@@ -60,100 +60,77 @@ type (
 	}
 )
 
-func TestValidatePositive(t *testing.T) {
-	tests := []interface{}{
-		App{
-			Version: "v1.00",
-		},
-		Status{
-			Name: "online",
-		},
-		Status{
-			Name: "offline",
-		},
-		IP{
-			Address: "192.168.0.1",
-		},
-		Enum{
-			Num: 1,
-		},
-		Char{
-			Num: 127,
-		},
-		Bit{
-			Num: 0,
-		},
-		Bit{
-			Num: 1,
-		},
-		Byte{
-			Num: 0,
-		},
-		Byte{
-			Num: 7,
-		},
-		Token{
-			Header:    []byte("Host:127.0.0.1"),
-			Payload:   []byte("foobar"),
-			Signature: []byte("Zm9vYmFyCg=="),
-		},
-	}
-	for i, tt := range tests {
-		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
-			tt := tt
-			t.Parallel()
-
-			err := Validate(tt)
-			require.NoError(t, err)
-		})
-	}
+type testCases []struct {
+	in          interface{}
+	expectedErr error
 }
 
-func TestValidateRegression(t *testing.T) {
-	tests := []interface{}{
-		Response{
-			Code: 200,
-			Body: "foobar",
+func TestValidate(t *testing.T) {
+	tests := testCases{
+		{
+			in: App{
+				Version: "v1.00",
+			},
+			expectedErr: nil,
 		},
-		User{
-			ID:     "123456789012345678901234567890123456",
-			Name:   "test",
-			Age:    29,
-			Email:  "foo@bar.baz",
-			Role:   "stuff",
-			Phones: []string{"+1234567890", "+1234567891"},
+		{
+			in: Status{
+				Name: "online",
+			},
+			expectedErr: nil,
 		},
-	}
-	for i, tt := range tests {
-		t.Run(fmt.Sprintf("case %d", i), func(t *testing.T) {
-			tt := tt
-			t.Parallel()
-
-			err := Validate(tt)
-			require.NoError(t, err)
-		})
-	}
-}
-
-func TestValidateNegative(t *testing.T) {
-	tests := []struct {
-		in          interface{}
-		expectedErr ValidationErrors
-	}{
+		{
+			in: IP{
+				Address: "192.168.0.1",
+			},
+			expectedErr: nil,
+		},
+		{
+			in: Enum{
+				Num: 1,
+			},
+			expectedErr: nil,
+		},
+		{
+			in: Char{
+				Num: 127,
+			},
+			expectedErr: nil,
+		},
+		{
+			in: Bit{
+				Num: 0,
+			},
+			expectedErr: nil,
+		},
+		{
+			in: Byte{
+				Num: 0,
+			},
+			expectedErr: nil,
+		},
+		{
+			in: Token{
+				Header:    []byte("Host:127.0.0.1"),
+				Payload:   []byte("foobar"),
+				Signature: []byte("Zm9vYmFyCg=="),
+			},
+			expectedErr: nil,
+		},
+		{
+			in: Response{
+				Code: 200,
+				Body: "foobar",
+			},
+			expectedErr: nil,
+		},
+		{
+			in:          getCorrectUser(),
+			expectedErr: nil,
+		},
 		{
 			in: App{
 				Version: "v1.00.00",
-			},
-			expectedErr: ValidationErrors{
-				ValidationError{
-					Field: "Version",
-					Err:   errorLen,
-				},
-			},
-		},
-		{
-			in: App{
-				Version: "v1",
 			},
 			expectedErr: ValidationErrors{
 				ValidationError{
@@ -196,17 +173,6 @@ func TestValidateNegative(t *testing.T) {
 			},
 		},
 		{
-			in: Byte{
-				Num: 8,
-			},
-			expectedErr: ValidationErrors{
-				ValidationError{
-					Field: "Num",
-					Err:   errorHigher,
-				},
-			},
-		},
-		{
 			in: Response{
 				Code: 499,
 				Body: "client close the connection",
@@ -219,14 +185,7 @@ func TestValidateNegative(t *testing.T) {
 			},
 		},
 		{
-			in: User{
-				ID:     "123456789012345678901234567890123456",
-				Name:   "test",
-				Age:    13,
-				Email:  "foo@bar.baz",
-				Role:   "stuff",
-				Phones: []string{"123", "234"},
-			},
+			in: getWrongUser(),
 			expectedErr: ValidationErrors{
 				ValidationError{
 					Field: "Age",
@@ -249,22 +208,31 @@ func TestValidateNegative(t *testing.T) {
 			tt := tt
 			t.Parallel()
 
-			actualErr := Validate(tt.in)
-			require.True(t, actualErr != nil)
+			err := Validate(tt.in)
 
-			actualErrList := ValidationErrors{}
-
-			if !errors.As(actualErr, &actualErrList) {
-				t.Fail()
-			}
-
-			if len(tt.expectedErr) != len(actualErrList) {
-				t.Fail()
-			}
-
-			for i, e := range tt.expectedErr {
-				require.Equal(t, e, actualErrList[i])
-			}
+			require.Equal(t, err, tt.expectedErr)
 		})
+	}
+}
+
+func getCorrectUser() User {
+	return User{
+		ID:     "123456789012345678901234567890123456",
+		Name:   "test",
+		Age:    29,
+		Email:  "foo@bar.baz",
+		Role:   "stuff",
+		Phones: []string{"+1234567890", "+1234567891"},
+	}
+}
+
+func getWrongUser() User {
+	return User{
+		ID:     "123456789012345678901234567890123456",
+		Name:   "test",
+		Age:    13,
+		Email:  "foo@bar.baz",
+		Role:   "stuff",
+		Phones: []string{"123", "234"},
 	}
 }

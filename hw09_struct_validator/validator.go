@@ -8,28 +8,10 @@ import (
 	"strings"
 )
 
-// ValidationError represents validation error in a single field.
-type ValidationError struct {
-	Field string
-	Err   error
-}
-
 // ApplicationError represents error in validator itself.
 type ApplicationError error
 
-// ValidationErrors represents all validation errors of a struct.
-type ValidationErrors []ValidationError
-
 type tagValidator []func(v interface{}) error
-
-type tagParser struct {
-	lenRegexp   *regexp.Regexp
-	reRegexp    *regexp.Regexp
-	strInRegexp *regexp.Regexp
-	minRegexp   *regexp.Regexp
-	maxRegexp   *regexp.Regexp
-	numInRegexp *regexp.Regexp
-}
 
 type (
 	ErrorLower          error
@@ -67,25 +49,34 @@ func apply(validator func(interface{}) error, fieldName string, fieldValue inter
 	}
 }
 
+// ValidationError represents validation error in a single field.
+type ValidationError struct {
+	Field string
+	Err   error
+}
+
 func (v ValidationError) Error() string {
 	return fmt.Sprintf("{ Field: %s, Error: %v }", v.Field, v.Err)
 }
 
+// ValidationErrors represents all validation errors of a struct.
+type ValidationErrors []ValidationError
+
 func (v ValidationErrors) Error() string {
 	var res strings.Builder
 	for idx, err := range v {
-		_, e := res.WriteString(
-			fmt.Sprintf(
-				"%d) %v\n",
-				idx+1,
-				err,
-			),
-		)
-		if e != nil {
-			panic(ApplicationError(e))
-		}
+		res.WriteString(fmt.Sprintf("%d) %v\n", idx+1, err))
 	}
 	return res.String()
+}
+
+type tagParser struct {
+	lenRegexp   *regexp.Regexp
+	reRegexp    *regexp.Regexp
+	strInRegexp *regexp.Regexp
+	minRegexp   *regexp.Regexp
+	maxRegexp   *regexp.Regexp
+	numInRegexp *regexp.Regexp
 }
 
 func newTagParser() *tagParser {
@@ -250,42 +241,42 @@ func (t tagParser) validateIfValueMatchesRegex(v interface{}, tag string) error 
 func (t tagParser) parseTags(tagString string, k reflect.Kind) (tagValidator, error) {
 	var validator tagValidator
 	tags := strings.Split(tagString, "|")
-	for _, tag := range tags {
-		closure := tag
+	for _, tg := range tags {
+		tag := tg
 		switch k { //nolint
 		case reflect.Int:
 			switch {
-			case t.minRegexp.Match([]byte(tag)):
+			case t.minRegexp.Match([]byte(tg)):
 				validator = append(validator, func(v interface{}) error {
-					return t.validateIfValueIsHigher(v, closure)
+					return t.validateIfValueIsHigher(v, tag)
 				})
-			case t.maxRegexp.Match([]byte(tag)):
+			case t.maxRegexp.Match([]byte(tg)):
 				validator = append(validator, func(v interface{}) error {
-					return t.validateIfValueIsLower(v, closure)
+					return t.validateIfValueIsLower(v, tag)
 				})
-			case t.numInRegexp.Match([]byte(tag)):
+			case t.numInRegexp.Match([]byte(tg)):
 				validator = append(validator, func(v interface{}) error {
-					return t.validateIfValueInRange(v, closure)
+					return t.validateIfValueInRange(v, tag)
 				})
 			default:
-				return nil, fmt.Errorf("unknown tag %s for int validator", tag)
+				return nil, fmt.Errorf("unknown tag %s for int validator", tg)
 			}
 		case reflect.String:
 			switch {
-			case t.lenRegexp.Match([]byte(tag)):
+			case t.lenRegexp.Match([]byte(tg)):
 				validator = append(validator, func(v interface{}) error {
-					return t.validateIfValueMatchesLen(v, closure)
+					return t.validateIfValueMatchesLen(v, tag)
 				})
-			case t.strInRegexp.Match([]byte(tag)):
+			case t.strInRegexp.Match([]byte(tg)):
 				validator = append(validator, func(v interface{}) error {
-					return t.validateIfValueInList(v, closure)
+					return t.validateIfValueInList(v, tag)
 				})
-			case t.reRegexp.Match([]byte(tag)):
+			case t.reRegexp.Match([]byte(tg)):
 				validator = append(validator, func(v interface{}) error {
-					return t.validateIfValueMatchesRegex(v, closure)
+					return t.validateIfValueMatchesRegex(v, tag)
 				})
 			default:
-				return nil, fmt.Errorf("unknown tag %s for string validator", tag)
+				return nil, fmt.Errorf("unknown tag %s for string validator", tg)
 			}
 		default:
 			return nil, fmt.Errorf("validation of %v is not supported", k)
@@ -306,11 +297,12 @@ func Validate(v interface{}) error {
 
 	// We won`t add recover() here since regexp in parser.initialize() are highly
 	// unliked to be changed
-	parser.initialize()
 
 	if t.Kind() != reflect.Struct {
 		return ApplicationError(fmt.Errorf("validator expects struct, got %v", t))
 	}
+
+	parser.initialize()
 
 	for i, f := range reflect.VisibleFields(t) {
 		tags, ok := f.Tag.Lookup("validate")
@@ -354,10 +346,8 @@ func Validate(v interface{}) error {
 		}
 	}
 
-	switch len(validationErrs) {
-	case 0:
+	if len(validationErrs) == 0 {
 		return nil
-	default:
-		return validationErrs
 	}
+	return validationErrs
 }
