@@ -56,7 +56,9 @@ func (t *myTelnetClient) Close() error {
 }
 
 func pushToFrom(dst io.Writer, src io.Reader, expectedError error) error {
-	buf := make([]byte, 128)
+	const bufSize = 128
+
+	buf := make([]byte, bufSize)
 
 	i, err := src.Read(buf)
 	if err != nil {
@@ -64,5 +66,6 @@ func pushToFrom(dst io.Writer, src io.Reader, expectedError error) error {
 	}
 
 	_, err = io.WriteString(dst, string(buf[:i]))
+
 	return err
 }
