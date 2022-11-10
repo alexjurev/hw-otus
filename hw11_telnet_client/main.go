@@ -48,12 +48,12 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	gracefulShutdown := make(chan os.Signal, 1)
 	signal.Notify(gracefulShutdown, syscall.SIGINT, syscall.SIGTERM)
-	go func(cancel context.CancelFunc) {
+	go func() {
 		for {
 			<-gracefulShutdown
-			cancel()
+			os.Exit(1)
 		}
-	}(cancel)
+	}()
 
 	errChan := make(chan contextKey)
 
