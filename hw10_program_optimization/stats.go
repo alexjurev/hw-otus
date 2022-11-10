@@ -1,67 +1,46 @@
 package hw10programoptimization
 
 import (
-	"encoding/json"
+	"bufio"
 	"fmt"
 	"io"
-	"io/ioutil"
-	"regexp"
 	"strings"
+
+	jsoniter "github.com/json-iterator/go"
 )
 
+// User represents user data.
 type User struct {
-	ID       int
-	Name     string
-	Username string
-	Email    string
-	Phone    string
-	Password string
-	Address  string
+	Email string `json:"email,omitempty"`
 }
 
+// DomainStat represents domains data.
 type DomainStat map[string]int
 
+var json = jsoniter.ConfigCompatibleWithStandardLibrary
+
+var user User
+
+// GetDomainStat gets domain users count.
 func GetDomainStat(r io.Reader, domain string) (DomainStat, error) {
-	u, err := getUsers(r)
-	if err != nil {
-		return nil, fmt.Errorf("get users error: %w", err)
-	}
-	return countDomains(u, domain)
-}
+	res := make(DomainStat)
 
-type users [100_000]User
+	scanner := bufio.NewScanner(r)
 
-func getUsers(r io.Reader) (result users, err error) {
-	content, err := ioutil.ReadAll(r)
-	if err != nil {
-		return
-	}
-
-	lines := strings.Split(string(content), "\n")
-	for i, line := range lines {
-		var user User
-		if err = json.Unmarshal([]byte(line), &user); err != nil {
-			return
-		}
-		result[i] = user
-	}
-	return
-}
-
-func countDomains(u users, domain string) (DomainStat, error) {
-	result := make(DomainStat)
-
-	for _, user := range u {
-		matched, err := regexp.Match("\\."+domain, []byte(user.Email))
-		if err != nil {
-			return nil, err
+	for scanner.Scan() {
+		if err := json.Unmarshal(scanner.Bytes(), &user); err != nil {
+			return DomainStat{}, fmt.Errorf("cannot unmarshal data: %w", err)
 		}
 
-		if matched {
-			num := result[strings.ToLower(strings.SplitN(user.Email, "@", 2)[1])]
-			num++
-			result[strings.ToLower(strings.SplitN(user.Email, "@", 2)[1])] = num
+		match := strings.Split(user.Email, "@")[1]
+		if len(match) < 2 {
+			return DomainStat{}, fmt.Errorf("unexpected data")
+		}
+
+		if strings.Contains(match, "."+domain) {
+			res[strings.ToLower(match)]++
 		}
 	}
-	return result, nil
+
+	return res, nil
 }
