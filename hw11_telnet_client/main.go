@@ -12,12 +12,7 @@ import (
 	"time"
 )
 
-type contextKey string
-
-var (
-	timeout       time.Duration
-	errContextKey contextKey = "err"
-)
+var timeout time.Duration
 
 func init() {
 	flag.DurationVar(&timeout, "timeout", 10*time.Second, "set connection timeout")
@@ -49,13 +44,11 @@ func main() {
 	gracefulShutdown := make(chan os.Signal, 1)
 	signal.Notify(gracefulShutdown, syscall.SIGINT, syscall.SIGTERM)
 	go func() {
-		for {
-			<-gracefulShutdown
-			os.Exit(1)
-		}
+		<-gracefulShutdown
+		os.Exit(1)
 	}()
 
-	errChan := make(chan contextKey)
+	errChan := make(chan error)
 
 	defer func() {
 		if v, ok := <-errChan; ok {
@@ -69,7 +62,7 @@ func main() {
 }
 
 func receive(ctx context.Context,
-	errChan chan contextKey,
+	errChan chan error,
 	cancel context.CancelFunc,
 	client TelnetClient,
 	wg *sync.WaitGroup,
@@ -84,7 +77,7 @@ func receive(ctx context.Context,
 			err := client.Receive()
 			if err != nil {
 				client.Close()
-				errChan <- errContextKey
+				errChan <- err
 				cancel()
 
 				return
@@ -94,7 +87,7 @@ func receive(ctx context.Context,
 }
 
 func send(ctx context.Context,
-	errChan chan contextKey,
+	errChan chan error,
 	cancel context.CancelFunc,
 	client TelnetClient,
 	wg *sync.WaitGroup,
@@ -110,7 +103,7 @@ func send(ctx context.Context,
 			err := client.Send()
 			if err != nil {
 				client.Close()
-				errChan <- errContextKey
+				errChan <- err
 				cancel()
 
 				return
