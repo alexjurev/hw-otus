@@ -31,12 +31,8 @@ func (s *Storage) Close(_ context.Context) error {
 }
 
 func (s *Storage) AddEvent(e *storage.Event) error {
-	if !e.EndTime.After(e.StartTime) {
-		return fmt.Errorf("start time of the event must be in the future: %w", storage.ErrIncorrectEventTime)
-	}
-
-	if e.StartTime.Before(time.Now()) {
-		return storage.ErrIncorrectEventTime
+	if err := e.Validate(); err != nil {
+		return err
 	}
 
 	s.mu.Lock()
