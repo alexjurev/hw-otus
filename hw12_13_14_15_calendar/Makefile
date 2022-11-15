@@ -29,15 +29,19 @@ version: build
 	$(BIN) version
 
 test:
-	go test -race ./internal/...
+	go test -race ./...
 
 test-all:
-	go test -v --tags sql -race ./internal/...
+	go test --tags sql -race ./...
+
+test-all-clean-cache:
+	go clean -testcache
+	go test --tags sql -race ./...
 
 migrate:
 	 goose postgres "dbname=postgres sslmode=disable host=${PG_HOST} port=${PG_PORT} password=${PG_PASS} user=${PG_USER}" up
 
-migrate-test:
+migrate-testing:
 	 goose postgres "dbname=testing sslmode=disable host=${PG_HOST} port=${PG_PORT} password=${PG_PASS} user=${PG_USER}" up
 
 install-lint-deps:
@@ -48,5 +52,15 @@ lint: install-lint-deps
 
 lint-fix: install-lint-deps
 	golangci-lint run ./... --fix
+
+install-gen-deps:
+	(which protoc-gen-go > /dev/null) || go install google.golang.org/protobuf/cmd/protoc-gen-go
+	(which protoc-gen-go-grpc > /dev/null) || go install google.golang.org/grpc/cmd/protoc-gen-go-grpc
+
+generate: install-gen-deps
+	go generate ./...
+
+
+#go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc
 
 .PHONY: build run build-img run-img version test lint

@@ -10,6 +10,7 @@ import (
 
 	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/app"
 	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/logger"
+	internalgrpc "github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/server/grpc"
 	internalhttp "github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/server/http"
 	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/storagebuilder"
 	log "github.com/sirupsen/logrus"
@@ -42,17 +43,17 @@ func main() {
 		log.Errorf("failed to start %v", err)
 		return
 	}
-	storage, err := storagebuilder.New(config.Storage)
+	stor, err := storagebuilder.NewStorage(config.Storage)
 	if err != nil {
 		log.Errorf("failed to start %v", err)
 		return
 	}
 
-	calendar := app.New(storage)
-	server := internalhttp.NewServer(config.Server, calendar)
+	calendar := app.New(stor)
+	httpServer := internalhttp.NewServer(config.HTTPServer, calendar)
+	grpcServer := internalgrpc.NewServer(config.GrpcServer, calendar)
 
-	ctx, cancel := signal.NotifyContext(context.Background(),
-		syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	defer cancel()
 
 	go func() {
@@ -60,29 +61,36 @@ func main() {
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 		defer cancel()
+		if err := grpcServer.Stop(ctx); err != nil {
+			log.Errorf("failed to stop grpc server: %v", err)
+		}
 
-		if err := server.Stop(ctx); err != nil {
-			log.Errorf("failed to stop http server: %s", err.Error())
+		ctx, cancel = context.WithTimeout(context.Background(), time.Second*3)
+		defer cancel()
+		if err := httpServer.Stop(ctx); err != nil {
+			log.Errorf("failed to stop http server: %v", err)
+		}
+
+		ctx, cancel = context.WithTimeout(context.Background(), time.Second*3)
+		defer cancel()
+		err := stor.Close(ctx)
+		if err != nil {
+			log.Errorf("failec to close storage: %v", err)
 		}
 	}()
 
 	log.Info("calendar is running...")
 
-	if err := server.Start(ctx); err != nil {
-		log.Errorf("failed to start http server: %s", err.Error())
-		cancel()
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-		err := storage.Close(ctx)
+	go func() {
+		err = grpcServer.Start(ctx)
 		if err != nil {
-			log.Errorf("failed to close storage: %s", err.Error())
+			cancel()
+			return
 		}
-		os.Exit(1) //nolint:gocritic
-	}
-	ctx, cancel = context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
-	err = storage.Close(ctx)
-	if err != nil {
-		log.Errorf("failed to close storage: %v", err)
+	}()
+
+	if err := httpServer.Start(ctx); err != nil {
+		log.Error("failed to start http server: " + err.Error())
+		cancel()
 	}
 }
