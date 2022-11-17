@@ -1,6 +1,9 @@
-server:
+httpServer:
   host: 127.0.0.1
-  port: 8080
+  port: 8005
+grpcServer:
+  host: 127.0.0.1
+  port: 8006
 
 logger:
   level: "DEBUG"
@@ -10,7 +13,7 @@ storage:
   #  storageType: sql
   database:
     host: 127.0.0.1
-    port: 5432
+    port: 5532
     database: postgres
     username: postgres
     password: pas
