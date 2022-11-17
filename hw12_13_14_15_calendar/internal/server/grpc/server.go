@@ -17,7 +17,6 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -176,7 +175,7 @@ func toStorageEvent(e *api.Event) (storage.Event, error) {
 		EndTime:      e.EndTime.AsTime(),
 		Description:  e.Description,
 		OwnerID:      e.OwnerId,
-		NotifyBefore: e.NotifyBefore.AsDuration(),
+		NotifyBefore: e.NotifyBefore,
 	}, nil
 }
 
@@ -188,7 +187,7 @@ func toAPIEvent(e storage.Event) *api.Event {
 		EndTime:      timestamppb.New(e.EndTime),
 		Description:  e.Description,
 		OwnerId:      e.OwnerID,
-		NotifyBefore: durationpb.New(e.NotifyBefore),
+		NotifyBefore: e.NotifyBefore,
 	}
 }
 
