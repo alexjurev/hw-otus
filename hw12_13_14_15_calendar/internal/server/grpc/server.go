@@ -122,11 +122,8 @@ func (s *Server) RemoveEvent(ctx context.Context, r *api.RemoveEventRequest) (*e
 
 func (s *Server) GetEventsForDay(ctx context.Context, r *api.GetEventsRequest) (*api.GetEventsResponse, error) {
 	date := r.GetStartDate()
-	if date == nil {
-		return nil, status.Errorf(codes.InvalidArgument, errDateIsNotProvided)
-	}
-	if !date.IsValid() {
-		return nil, status.Errorf(codes.InvalidArgument, errIncorrectDate)
+	if err := validateDate(date); err != nil {
+		return nil, err
 	}
 	events, err := s.app.GetEventsForDay(ctx, date.AsTime())
 	if err != nil {
@@ -138,11 +135,8 @@ func (s *Server) GetEventsForDay(ctx context.Context, r *api.GetEventsRequest) (
 
 func (s *Server) GetEventsForWeek(ctx context.Context, r *api.GetEventsRequest) (*api.GetEventsResponse, error) {
 	date := r.GetStartDate()
-	if date == nil {
-		return nil, status.Errorf(codes.InvalidArgument, errDateIsNotProvided)
-	}
-	if !date.IsValid() {
-		return nil, status.Errorf(codes.InvalidArgument, errIncorrectDate)
+	if err := validateDate(date); err != nil {
+		return nil, err
 	}
 	events, err := s.app.GetEventsForWeek(ctx, date.AsTime())
 	if err != nil {
@@ -157,11 +151,8 @@ func (s *Server) GetEventsForWeek(ctx context.Context, r *api.GetEventsRequest) 
 
 func (s *Server) GetEventsForMonth(ctx context.Context, r *api.GetEventsRequest) (*api.GetEventsResponse, error) {
 	date := r.GetStartDate()
-	if date == nil {
-		return nil, status.Errorf(codes.InvalidArgument, errDateIsNotProvided)
-	}
-	if !date.IsValid() {
-		return nil, status.Errorf(codes.InvalidArgument, errIncorrectDate)
+	if err := validateDate(date); err != nil {
+		return nil, err
 	}
 	events, err := s.app.GetEventsForMonth(ctx, date.AsTime())
 	if err != nil {
@@ -207,4 +198,15 @@ func toAPIEvents(events []storage.Event) []*api.Event {
 		apiEvents = append(apiEvents, toAPIEvent(event))
 	}
 	return apiEvents
+}
+
+func validateDate(date *timestamppb.Timestamp) error {
+	if date == nil {
+		return status.Errorf(codes.InvalidArgument, errDateIsNotProvided)
+	}
+	if !date.IsValid() {
+		return status.Errorf(codes.InvalidArgument, errIncorrectDate)
+	}
+
+	return nil
 }

@@ -74,14 +74,8 @@ func getIP(req *http.Request) (string, error) {
 
 func (s *Server) AddEvent(w http.ResponseWriter, r *http.Request) {
 	event := storage.Event{}
-	res, err := io.ReadAll(r.Body)
-	if err != nil {
-		w.Write([]byte(err.Error()))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
 
-	err = json.Unmarshal(res, &event)
+	err := parseRequestBody(r, &event)
 	if err != nil {
 		w.Write([]byte(err.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -104,14 +98,7 @@ type UpdateReq struct {
 
 func (s *Server) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 	updateEvent := UpdateReq{}
-	res, err := io.ReadAll(r.Body)
-	if err != nil {
-		w.Write([]byte(err.Error()))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	err = json.Unmarshal(res, &updateEvent)
+	err := parseRequestBody(r, &updateEvent)
 	if err != nil {
 		w.Write([]byte(err.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -128,14 +115,7 @@ func (s *Server) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) RemoveEvent(w http.ResponseWriter, r *http.Request) {
 	event := storage.Event{}
-	res, err := io.ReadAll(r.Body)
-	if err != nil {
-		w.Write([]byte(err.Error()))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	err = json.Unmarshal(res, &event)
+	err := parseRequestBody(r, &event)
 	if err != nil {
 		w.Write([]byte(err.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -162,14 +142,7 @@ const (
 
 func (s *Server) GetEvents(w http.ResponseWriter, r *http.Request, period string) {
 	date := ReqDate{}
-	res, err := io.ReadAll(r.Body)
-	if err != nil {
-		w.Write([]byte(err.Error()))
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-
-	err = json.Unmarshal(res, &date)
+	err := parseRequestBody(r, &date)
 	if err != nil {
 		w.Write([]byte(err.Error()))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -217,4 +190,18 @@ func (s *Server) GetEventsForWeek(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) GetEventsForMonth(w http.ResponseWriter, r *http.Request) {
 	s.GetEvents(w, r, month)
+}
+
+func parseRequestBody(r *http.Request, v interface{}) error {
+	res, err := io.ReadAll(r.Body)
+	if err != nil {
+		return err
+	}
+
+	err = json.Unmarshal(res, &v)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

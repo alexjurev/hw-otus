@@ -31,25 +31,13 @@ func (a *App) RemoveEvent(ctx context.Context, id string) error {
 }
 
 func (a *App) GetEventsForDay(ctx context.Context, date time.Time) ([]storage.Event, error) {
-	events, err := a.Storage.GetEventsForDay(ctx, date)
-	if err != nil {
-		return nil, err
-	}
-	return events, nil
+	return a.Storage.GetEventsForDay(ctx, date)
 }
 
 func (a *App) GetEventsForWeek(ctx context.Context, startDate time.Time) ([]storage.Event, error) {
-	events, err := a.Storage.GetEventsForWeek(ctx, startDate)
-	if err != nil {
-		return nil, err
-	}
-	return events, nil
+	return a.Storage.GetEventsForWeek(ctx, startDate)
 }
 
 func (a *App) GetEventsForMonth(ctx context.Context, startDate time.Time) ([]storage.Event, error) {
-	events, err := a.Storage.GetEventsForMonth(ctx, startDate)
-	if err != nil {
-		return nil, err
-	}
-	return events, nil
+	return a.Storage.GetEventsForMonth(ctx, startDate)
 }
