@@ -5,31 +5,27 @@ import (
 	"strings"
 
 	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/logger"
-	internalgrpc "github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/server/grpc"
-	internalhttp "github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/server/http"
-	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/storagebuilder"
+	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/rabbit"
 	"github.com/spf13/viper"
 )
 
 const envConfigPrefix = "$env:"
 
 type Config struct {
-	HTTPServer internalhttp.Config
-	GrpcServer internalgrpc.Config
-	Logger     logger.Config
-	Storage    storagebuilder.Config
+	Logger logger.Config
+	Rabbit rabbit.Config
 }
 
 func NewConfig(configFile string) (Config, error) {
 	config := Config{}
 	viper.SetConfigFile(configFile)
 
-	viper.SetDefault("httpServer.host", "127.0.0.1")
-	viper.SetDefault("httpServer.port", "8005")
-	viper.SetDefault("grpcServer.host", "127.0.0.1")
-	viper.SetDefault("grpcServer.port", "8006")
+	viper.SetDefault("rabbit.host", "127.0.0.1")
+	viper.SetDefault("rabbit.port", "5672")
+	viper.SetDefault("rabbit.user", "user")
+	viper.SetDefault("rabbit.password", "pass")
+	viper.SetDefault("rabbit.queue", "calendar.notify")
 	viper.SetDefault("logger.level", "WARN")
-	viper.SetDefault("storage.storageType", "memory")
 
 	err := viper.ReadInConfig()
 	if err != nil {
