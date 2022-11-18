@@ -1,16 +1,50 @@
-package memorystorage_test
+//go:build sql
+// +build sql
+
+package sqlstorage_test
 
 import (
 	"context"
 	"fmt"
-	"sync/atomic"
+	"log"
+	"os"
+	"strconv"
 	"testing"
 	"time"
 
 	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/storage"
-	memorystorage "github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/storage/memory"
+	sqlstorage "github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/storage/sql"
+	"github.com/jmoiron/sqlx"
 	"github.com/stretchr/testify/require"
 )
+
+var (
+	host     = "127.0.0.1"
+	port     = 5432
+	database = "testing"
+	username = "postgres"
+	password = "pas"
+)
+
+func TestMain(m *testing.M) {
+	pgHost := os.Getenv("TEST_POSTGRES_HOST")
+	pgPort := os.Getenv("TEST_POSTGRES_PORT")
+	if pgHost != "" {
+		host = pgHost
+	}
+	if pgPort != "" {
+		var err error
+		port, err = strconv.Atoi(pgPort)
+		if err != nil {
+			log.Printf("failed to parse port '%s': %v", pgPort, err)
+			os.Exit(-1)
+		}
+	}
+
+	cleanupDb()
+	code := m.Run()
+	os.Exit(code)
+}
 
 func TestStorage(t *testing.T) {
 	t.Run("add event", func(t *testing.T) {
@@ -36,7 +70,7 @@ func TestStorage(t *testing.T) {
 	})
 
 	t.Run("update event", func(t *testing.T) {
-		initDate := time.Date(2300, 0o1, 0o1, 0, 0, 0, 0, time.UTC)
+		initDate := time.Date(2300, 01, 01, 0, 0, 0, 0, time.UTC)
 		e := storage.Event{
 			ID:           "",
 			Title:        "test",
@@ -56,10 +90,7 @@ func TestStorage(t *testing.T) {
 		e.Description = "updated description"
 		e.NotifyBefore = 100
 
-		id := e.ID
-		e.ID = ""
-		require.NoError(t, s.UpdateEvent(context.Background(), id, e))
-		e.ID = id
+		require.NoError(t, s.UpdateEvent(context.Background(), e.ID, e))
 
 		events, err := s.GetEventsForWeek(context.Background(), initDate)
 		require.NoError(t, err)
@@ -68,7 +99,7 @@ func TestStorage(t *testing.T) {
 	})
 
 	t.Run("delete event", func(t *testing.T) {
-		initDate := time.Date(2300, 0o1, 0o1, 0, 0, 0, 0, time.UTC)
+		initDate := time.Date(2300, 01, 01, 0, 0, 0, 0, time.UTC)
 		e := storage.Event{
 			ID:           "",
 			Title:        "test",
@@ -90,7 +121,7 @@ func TestStorage(t *testing.T) {
 	})
 
 	t.Run("list", func(t *testing.T) {
-		initDate := time.Date(2300, 0o1, 0o1, 0, 0, 0, 0, time.UTC)
+		initDate := time.Date(2300, 01, 01, 0, 0, 0, 0, time.UTC)
 		e := storage.Event{
 			ID:           "",
 			Title:        "test",
@@ -147,7 +178,7 @@ func TestStorageNegativeCases(t *testing.T) {
 	})
 
 	t.Run("update not exist event", func(t *testing.T) {
-		initDate := time.Date(2300, 0o1, 0o1, 0, 0, 0, 0, time.UTC)
+		initDate := time.Date(2300, 01, 01, 0, 0, 0, 0, time.UTC)
 		e := storage.Event{ID: "___not_exists___", StartTime: initDate, EndTime: initDate.Add(time.Hour)}
 		s := createStorage(t)
 
@@ -178,7 +209,7 @@ func TestStorageNegativeCases(t *testing.T) {
 	})
 
 	t.Run("incorrect event time for insert", func(t *testing.T) {
-		initDate := time.Date(2300, 0o1, 0o1, 0, 0, 0, 0, time.UTC)
+		initDate := time.Date(2300, 01, 01, 0, 0, 0, 0, time.UTC)
 		e := storage.Event{StartTime: initDate.Add(time.Hour), EndTime: initDate}
 		s := createStorage(t)
 
@@ -186,7 +217,7 @@ func TestStorageNegativeCases(t *testing.T) {
 	})
 
 	t.Run("incorrect event time for insert", func(t *testing.T) {
-		initDate := time.Date(2300, 0o1, 0o1, 0, 0, 0, 0, time.UTC)
+		initDate := time.Date(2300, 01, 01, 0, 0, 0, 0, time.UTC)
 		e := storage.Event{StartTime: initDate.Add(time.Hour), EndTime: initDate}
 		s := createStorage(t)
 
@@ -196,47 +227,47 @@ func TestStorageNegativeCases(t *testing.T) {
 
 func TestStorageValidateStarDates(t *testing.T) {
 	tests := []struct {
-		testFunc    func(s *memorystorage.Storage) error
+		testFunc    func(s *sqlstorage.Storage) error
 		expectedErr error
 	}{
 		{
-			testFunc: func(s *memorystorage.Storage) error {
-				_, err := s.GetEventsForWeek(context.Background(), time.Date(2021, 12, 0o6, 0, 0, 0, 0, time.UTC))
+			testFunc: func(s *sqlstorage.Storage) error {
+				_, err := s.GetEventsForWeek(context.Background(), time.Date(2021, 12, 06, 0, 0, 0, 0, time.UTC))
 				return err
 			},
 			expectedErr: nil,
 		},
 		{
-			testFunc: func(s *memorystorage.Storage) error {
-				_, err := s.GetEventsForWeek(context.Background(), time.Date(2300, 0o1, 8, 0, 0, 0, 0, time.UTC))
+			testFunc: func(s *sqlstorage.Storage) error {
+				_, err := s.GetEventsForWeek(context.Background(), time.Date(2300, 01, 8, 0, 0, 0, 0, time.UTC))
 				return err
 			},
 			expectedErr: nil,
 		},
 		{
-			testFunc: func(s *memorystorage.Storage) error {
-				_, err := s.GetEventsForWeek(context.Background(), time.Date(2300, 0o1, 29, 0, 0, 0, 0, time.UTC))
+			testFunc: func(s *sqlstorage.Storage) error {
+				_, err := s.GetEventsForWeek(context.Background(), time.Date(2300, 01, 29, 0, 0, 0, 0, time.UTC))
 				return err
 			},
 			expectedErr: nil,
 		},
 		{
-			testFunc: func(s *memorystorage.Storage) error {
+			testFunc: func(s *sqlstorage.Storage) error {
 				_, err := s.GetEventsForMonth(context.Background(), time.Date(2300, 1, 1, 0, 0, 0, 0, time.UTC))
 				return err
 			},
 			expectedErr: nil,
 		},
 		{
-			testFunc: func(s *memorystorage.Storage) error {
-				_, err := s.GetEventsForWeek(context.Background(), time.Date(2300, 0o1, 0o2, 0, 0, 0, 0, time.UTC))
+			testFunc: func(s *sqlstorage.Storage) error {
+				_, err := s.GetEventsForWeek(context.Background(), time.Date(2300, 01, 02, 0, 0, 0, 0, time.UTC))
 				return err
 			},
 			expectedErr: storage.ErrIncorrectStartDate,
 		},
 		{
-			testFunc: func(s *memorystorage.Storage) error {
-				_, err := s.GetEventsForMonth(context.Background(), time.Date(2300, 0o1, 0o2, 0, 0, 0, 0, time.UTC))
+			testFunc: func(s *sqlstorage.Storage) error {
+				_, err := s.GetEventsForMonth(context.Background(), time.Date(2300, 01, 02, 0, 0, 0, 0, time.UTC))
 				return err
 			},
 			expectedErr: storage.ErrIncorrectStartDate,
@@ -255,119 +286,40 @@ func TestStorageValidateStarDates(t *testing.T) {
 	}
 }
 
-func TestStorageConcurrent(t *testing.T) {
-	t.Run("insert", func(t *testing.T) {
-		initDate := time.Date(2300, 1, 1, 0, 0, 0, 0, time.UTC)
-		e := storage.Event{
-			ID:           "",
-			Title:        "test",
-			StartTime:    initDate.Add(1 * time.Hour),
-			EndTime:      initDate.Add(2 * time.Hour),
-			Description:  "description",
-			OwnerID:      "testId",
-			NotifyBefore: 0,
-		}
-		s := createStorage(t)
+func cleanupDb() error {
+	db, err := sqlx.Connect(
+		"postgres",
+		fmt.Sprintf("sslmode=disable host=%s port=%d dbname=%s user=%s password=%s", host, port, database, username, password),
+	)
+	if err != nil {
+		return err
+	}
+	defer db.Close()
 
-		var counter int32
-		waitCh := make(chan struct{})
-
-		for i := 0; i < 100; i++ {
-			go func(i int, e storage.Event) {
-				atomic.AddInt32(&counter, 1)
-				<-waitCh
-				e.StartTime = e.StartTime.Add(time.Duration(i) * time.Second)
-				e.EndTime = e.EndTime.Add(time.Duration(i+1) * time.Second)
-				e.Title = fmt.Sprintf("%d", i)
-				s.AddEvent(context.Background(), &e)
-				atomic.AddInt32(&counter, 1)
-			}(i, e)
-		}
-
-		require.Eventually(t, func() bool { return atomic.LoadInt32(&counter) == 100 }, time.Second, time.Millisecond)
-		counter = 0
-		close(waitCh)
-		require.Eventually(t, func() bool { return atomic.LoadInt32(&counter) == 100 }, time.Second, time.Millisecond)
-
-		events, err := s.GetEventsForDay(context.Background(), initDate)
-		require.NoError(t, err)
-		require.Equal(t, 100, len(events))
-	})
-
-	t.Run("read", func(t *testing.T) {
-		initDate := time.Date(2300, 1, 1, 0, 0, 0, 0, time.UTC)
-		e := storage.Event{
-			ID:           "",
-			Title:        "test",
-			StartTime:    initDate.Add(1 * time.Hour),
-			EndTime:      initDate.Add(2 * time.Hour),
-			Description:  "description",
-			OwnerID:      "testId",
-			NotifyBefore: 0,
-		}
-		s := createStorage(t)
-
-		eventsCount := 10000
-		for i := 0; i < eventsCount; i++ {
-			e.ID = ""
-			e.StartTime = e.StartTime.Add(time.Duration(i) * time.Second)
-			e.EndTime = e.EndTime.Add(time.Duration(i+1) * time.Second)
-			e.Title = fmt.Sprintf("%s-%d", e.Title, i)
-			s.AddEvent(context.Background(), &e)
-		}
-
-		var counter int32
-		readerCount := 1000
-		waitCh := make(chan struct{})
-		for i := 0; i < readerCount; i++ {
-			go func() {
-				atomic.AddInt32(&counter, 1)
-				<-waitCh
-				//	s.GetEventsForMonth(initDate)
-				atomic.AddInt32(&counter, 1)
-			}()
-		}
-
-		require.Eventually(
-			t,
-			func() bool { return int(atomic.LoadInt32(&counter)) == readerCount },
-			time.Second,
-			time.Millisecond,
-		)
-		counter = 0
-		close(waitCh)
-		require.Eventually(
-			t,
-			func() bool { return int(atomic.LoadInt32(&counter)) == readerCount },
-			1500*time.Millisecond,
-			time.Millisecond,
-		)
-	})
+	_, err = db.Exec("TRUNCATE TABLE Events")
+	if err != nil {
+		return err
+	}
+	return err
 }
 
 func compareEvents(t *testing.T, expected storage.Event, actual storage.Event) {
 	t.Helper()
-	require.True(
-		t,
-		expected.StartTime.Equal(actual.StartTime),
-		"start time is not equals %q != %q", expected.StartTime, actual.StartTime)
-	require.True(
-		t,
-		expected.StartTime.Equal(actual.StartTime),
-		"start time is not equals %q != %q", expected.StartTime, actual.StartTime)
+	require.True(t, expected.StartTime.Equal(actual.StartTime), "start time is not equals %q != %q", expected.StartTime, actual.StartTime)
+	require.True(t, expected.StartTime.Equal(actual.StartTime), "start time is not equals %q != %q", expected.StartTime, actual.StartTime)
 	expected.StartTime = actual.StartTime
 	expected.EndTime = actual.EndTime
 	require.Equal(t, expected, actual)
 }
 
-func createStorage(t *testing.T) *memorystorage.Storage {
+func createStorage(t *testing.T) *sqlstorage.Storage {
 	t.Helper()
-	s := memorystorage.New()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
+	s := sqlstorage.New(sqlstorage.Config{Host: host, Port: port, Database: database, Username: username, Password: password})
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
 	require.NoError(t, s.Connect(ctx))
 	t.Cleanup(func() {
 		s.Close(ctx)
+		require.NoError(t, cleanupDb())
 	})
 	return s
 }

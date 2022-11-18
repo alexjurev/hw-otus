@@ -8,16 +8,21 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fixme_my_friend/hw12_13_14_15_calendar/internal/app"
-	"github.com/fixme_my_friend/hw12_13_14_15_calendar/internal/logger"
-	internalhttp "github.com/fixme_my_friend/hw12_13_14_15_calendar/internal/server/http"
-	memorystorage "github.com/fixme_my_friend/hw12_13_14_15_calendar/internal/storage/memory"
+	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/app"
+	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/logger"
+	internalgrpc "github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/server/grpc"
+	internalhttp "github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/server/http"
+	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/storagebuilder"
+	log "github.com/sirupsen/logrus"
 )
 
 var configFile string
 
 func init() {
-	flag.StringVar(&configFile, "config", "/etc/calendar/config.toml", "Path to configuration file")
+	flag.StringVar(&configFile, "config", "./configs/config.yaml", "Path to configuration file")
+	log.SetFormatter(&log.TextFormatter{})
+	log.SetOutput(os.Stdout)
+	log.SetLevel(log.WarnLevel)
 }
 
 func main() {
@@ -28,16 +33,27 @@ func main() {
 		return
 	}
 
-	config := NewConfig()
-	logg := logger.New(config.Logger.Level)
+	config, err := NewConfig(configFile)
+	if err != nil {
+		log.Errorf("failed to start %v", err)
+		return
+	}
+	err = logger.PrepareLogger(config.Logger)
+	if err != nil {
+		log.Errorf("failed to start %v", err)
+		return
+	}
+	stor, err := storagebuilder.NewStorage(config.Storage)
+	if err != nil {
+		log.Errorf("failed to start %v", err)
+		return
+	}
 
-	storage := memorystorage.New()
-	calendar := app.New(logg, storage)
+	calendar := app.New(stor)
+	httpServer := internalhttp.NewServer(config.HTTPServer, calendar)
+	grpcServer := internalgrpc.NewServer(config.GrpcServer, calendar)
 
-	server := internalhttp.NewServer(logg, calendar)
-
-	ctx, cancel := signal.NotifyContext(context.Background(),
-		syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	defer cancel()
 
 	go func() {
@@ -45,17 +61,36 @@ func main() {
 
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
 		defer cancel()
+		if err := grpcServer.Stop(ctx); err != nil {
+			log.Errorf("failed to stop grpc server: %v", err)
+		}
 
-		if err := server.Stop(ctx); err != nil {
-			logg.Error("failed to stop http server: " + err.Error())
+		ctx, cancel = context.WithTimeout(context.Background(), time.Second*3)
+		defer cancel()
+		if err := httpServer.Stop(ctx); err != nil {
+			log.Errorf("failed to stop http server: %v", err)
+		}
+
+		ctx, cancel = context.WithTimeout(context.Background(), time.Second*3)
+		defer cancel()
+		err := stor.Close(ctx)
+		if err != nil {
+			log.Errorf("failec to close storage: %v", err)
 		}
 	}()
 
-	logg.Info("calendar is running...")
+	log.Info("calendar is running...")
 
-	if err := server.Start(ctx); err != nil {
-		logg.Error("failed to start http server: " + err.Error())
+	go func() {
+		err = grpcServer.Start(ctx)
+		if err != nil {
+			cancel()
+			return
+		}
+	}()
+
+	if err := httpServer.Start(ctx); err != nil {
+		log.Error("failed to start http server: " + err.Error())
 		cancel()
-		os.Exit(1) //nolint:gocritic
 	}
 }
