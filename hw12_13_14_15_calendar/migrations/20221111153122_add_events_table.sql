@@ -4,6 +4,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 CREATE TABLE events (
                         id uuid NOT NULL DEFAULT uuid_generate_v4(),
                         title varchar NOT NULL,
+                        is_sent boolean NOT NULL DEFAULT false,
                         start_timestamp timestamp(0) NOT NULL,
                         end_timestamp timestamp(0) NULL,
                         description varchar NULL,

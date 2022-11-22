@@ -165,7 +165,7 @@ func (s *Storage) GetEventsForMonth(ctx context.Context, startDate time.Time) ([
 
 func (s *Storage) GetEventsByNotifier(
 	ctx context.Context,
-	startTime time.Time,
+	limit int,
 	endTime time.Time,
 ) ([]storage.Event, error) {
 	var events []storage.Event
@@ -174,13 +174,39 @@ func (s *Storage) GetEventsByNotifier(
 		&events,
 		"SELECT id, title, start_timestamp AS startTime, end_timestamp AS endTime, description, "+
 			"notify_before AS notifyBefore, owner_id AS ownerId "+
-			"FROM Events WHERE notify_before > 0 AND (start_timestamp - (interval '1' day * notify_before))>=$1 "+
-			"AND (start_timestamp - (interval '1' day * notify_before))<=$2",
-		startTime,
+			"FROM Events WHERE notify_before > 0 AND (start_timestamp - (interval '1' day * notify_before))<=$1 "+
+			"AND NOT is_sent LIMIT $2",
 		endTime,
+		limit,
 	)
 
 	return events, err
+}
+
+func (s *Storage) MarkSentEvents(
+	ctx context.Context,
+	events []storage.Event,
+) error {
+	if len(events) == 0 {
+		return nil
+	}
+	var found bool
+	for _, event := range events {
+		err := s.db.GetContext(
+			ctx,
+			&found,
+			"UPDATE Events SET is_sent = true WHERE id=$1 RETURNING TRUE",
+			event.ID,
+		)
+		if !found {
+			return fmt.Errorf("failed to update event with id %q: %w", event.ID, storage.ErrNotFoundEvent)
+		}
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (s *Storage) RemoveAfter(ctx context.Context, time time.Time) error {
