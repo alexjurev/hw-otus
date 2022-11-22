@@ -2,6 +2,12 @@ BIN := "./bin/calendar"
 SCHEDULER_BIN := "./bin/calendar_scheduler"
 SENDER_BIN := "./bin/calendar_sender"
 DOCKER_IMG="calendar:develop"
+SCHEDULER_BIN := "./bin/calendar_scheduler"
+SCHEDULER_DOCKER_IMG="scheduler:develop"
+SENDER_BIN := "./bin/calendar_sender"
+SENDER_DOCKER_IMG="sender:develop"
+MIGRATIONS_DOCKER_IMG="migrations:develop"
+INTEGRATION_TEST_DOCKER_IMG="integration-test:develop"
 
 # Postgres - for migrations
 PG_HOST := $(if ${POSTGRES_HOST},${POSTGRES_HOST},127.0.0.1)
@@ -20,14 +26,50 @@ build:
 run: build
 	$(BIN) -config ./configs/config.yaml
 
+build-img-all: build-img build-img-sender build-img-scheduler build-img-migrations build-img-integration-tests
+
 build-img:
 	docker build \
 		--build-arg=LDFLAGS="$(LDFLAGS)" \
 		-t $(DOCKER_IMG) \
 		-f build/Dockerfile .
 
+build-img-sender:
+	docker build \
+		--build-arg=LDFLAGS="$(LDFLAGS)" \
+		-t $(SENDER_DOCKER_IMG) \
+		-f build/Dockerfile-sender .
+
+build-img-scheduler:
+	docker build \
+		--build-arg=LDFLAGS="$(LDFLAGS)" \
+		-t $(SCHEDULER_DOCKER_IMG) \
+		-f build/Dockerfile-scheduler .
+
+build-img-migrations:
+	docker build \
+		--build-arg=LDFLAGS="$(LDFLAGS)" \
+		-t $(MIGRATIONS_DOCKER_IMG) \
+		-f build/Dockerfile-migrations .
+
+build-img-integration-tests:
+	docker build \
+		--build-arg=LDFLAGS="$(LDFLAGS)" \
+		-t $(INTEGRATION_TEST_DOCKER_IMG) \
+		-f build/Dockerfile-integration-test .
+
+integration-tests:
+	docker-compose -f build/docker-compose.yaml -f build/docker-compose-integration-test.yaml run migrations
+	docker-compose -f build/docker-compose.yaml -f build/docker-compose-integration-test.yaml run integration_tests
+
 run-img: build-img
 	docker run $(DOCKER_IMG)
+
+up:
+	docker-compose -f build/docker-compose.yaml up
+
+down:
+	docker-compose -f build/docker-compose.yaml down
 
 version: build
 	$(BIN) version
@@ -63,8 +105,5 @@ install-gen-deps:
 
 generate: install-gen-deps
 	go generate ./...
-
-
-#go get -u google.golang.org/grpc/cmd/protoc-gen-go-grpc
 
 .PHONY: build run build-img run-img version test lint
