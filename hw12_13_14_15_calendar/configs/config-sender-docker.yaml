@@ -6,3 +6,13 @@ rabbit:
 
 logger:
   level: "ERROR"
+
+storage:
+  #  storageType: memory
+  storageType: sql
+  database:
+    host: $env:POSTGRES_HOST
+    port: $env:POSTGRES_PORT
+    database: $env:POSTGRES_DB
+    username: $env:POSTGRES_USERNAME
+    password: $env:POSTGRES_PASSWORD

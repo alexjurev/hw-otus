@@ -58,9 +58,16 @@ build-img-integration-tests:
 		-t $(INTEGRATION_TEST_DOCKER_IMG) \
 		-f build/Dockerfile-integration-test .
 
-integration-tests:
+run-integration-tests:
 	docker-compose -f build/docker-compose.yaml -f build/docker-compose-integration-test.yaml run migrations
 	docker-compose -f build/docker-compose.yaml -f build/docker-compose-integration-test.yaml run integration_tests
+
+run-integration-tests-infra:
+	docker-compose -f build/docker-compose.yaml up -d
+	docker-compose -f build/docker-compose.yaml -f build/docker-compose-integration-test.yaml run migrations
+	docker-compose -f build/docker-compose.yaml -f build/docker-compose-integration-test.yaml run integration_tests
+
+integration-tests: build-img-all build-img-integration-tests run-integration-tests-infra
 
 run-img: build-img
 	docker run $(DOCKER_IMG)

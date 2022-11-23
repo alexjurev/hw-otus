@@ -88,12 +88,19 @@ services:
     image: sender:develop
     container_name: 'sender-otus'
     environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_DB: postgres
+      POSTGRES_USERNAME: postgres
+      POSTGRES_PASSWORD: postgres
+
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_PORT: 5672
       RABBITMQ_USER: user
       RABBITMQ_PASSWORD: pass
 
-      WAIT_HOSTS: rabbitmq:5672
+      WAIT_HOSTS: postgres:5432, rabbitmq:5672
       WAIT_SLEEP_INTERVAL: 2
     depends_on:
+      - "postgres"
       - "rabbitmq"

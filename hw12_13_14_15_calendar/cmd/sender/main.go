@@ -10,6 +10,7 @@ import (
 
 	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/logger"
 	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/rabbit"
+	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/storagebuilder"
 	log "github.com/sirupsen/logrus"
 	"github.com/streadway/amqp"
 )
@@ -41,6 +42,12 @@ func main() {
 	r.Connect()
 	defer r.Close()
 
+	stor, err := storagebuilder.NewStorage(config.Storage)
+	if err != nil {
+		log.Errorf("failed to start %v", err)
+		return
+	}
+
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	defer cancel()
 
@@ -53,5 +60,11 @@ func main() {
 			return
 		}
 		log.Printf("sending message %v", m)
+		err = stor.AddSenderLog(ctx, &m)
+		if err != nil {
+			log.Errorf("failed to add sender log: %s", err)
+			cancel()
+			return
+		}
 	})
 }

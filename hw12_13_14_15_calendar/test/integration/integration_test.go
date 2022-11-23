@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -16,6 +17,8 @@ import (
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/rabbit"
 
 	internalhttp "github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/server/http"
 
@@ -420,5 +423,94 @@ func cleanupDB() error {
 	if err != nil {
 		return err
 	}
+	_, err = db.Exec("TRUNCATE TABLE Sender_logs")
+
 	return err
+}
+
+func TestSender(t *testing.T) {
+	t.Run("add event", func(t *testing.T) {
+		require.NoError(t, cleanupDB())
+		event := storage.Event{
+			ID:           "c96506d7-22c4-4b11-bfdb-76faabde3a99",
+			Title:        "sender_check",
+			StartTime:    time.Now().Add(24 * time.Hour),
+			EndTime:      time.Now().Add(24*time.Hour + 2*time.Minute),
+			Description:  "1234sender",
+			OwnerID:      "sender",
+			NotifyBefore: 1,
+		}
+		jsonStr, err := json.Marshal(event)
+		require.NoError(t, err)
+
+		resp := sendRequest(t, "POST", httpServerURL, "add", jsonStr)
+		defer resp.Body.Close()
+		require.Equal(t, 200, resp.StatusCode)
+		body, err := ioutil.ReadAll(resp.Body)
+		require.NoError(t, err, "failed to read body")
+		require.NotEmpty(t, string(body))
+		require.Equal(t, event.ID, string(body))
+
+		message, err := waitForEventSenderLogDB(event.ID)
+		require.NoError(t, err)
+		require.Equal(t, event.ID, message.ID)
+		require.Equal(t, event.OwnerID, message.OwnerID)
+		cleanupDB()
+	})
+}
+
+func waitForEventSenderLogDB(id string) (rabbit.Message, error) {
+	if storageType != "sql" {
+		return rabbit.Message{}, nil
+	}
+	db, err := sqlx.Connect(
+		"postgres",
+		fmt.Sprintf(
+			"sslmode=disable host=%s port=%d dbname=%s user=%s password=%s",
+			pgHost,
+			pgPort,
+			pgDatabase,
+			pgUsername,
+			pgPassword,
+		),
+	)
+	if err != nil {
+		return rabbit.Message{}, nil
+	}
+	defer db.Close()
+	logMessage := make([]rabbit.Message, 0)
+
+	ticker := time.NewTicker(time.Second)
+	c1 := make(chan rabbit.Message)
+	go func(logMessage []rabbit.Message) {
+		for range ticker.C {
+			err = db.SelectContext(
+				context.Background(),
+				&logMessage,
+				"SELECT id, name, time, owner_id AS ownerId "+
+					"FROM Sender_logs WHERE id = $1",
+				id,
+			)
+			switch len(logMessage) {
+			case 0:
+				continue
+			default:
+				ticker.Stop()
+				c1 <- logMessage[0]
+				break
+			}
+		}
+	}(logMessage)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	for {
+		select {
+		case msg := <-c1:
+			return msg, nil
+		case <-ctx.Done():
+			cancel()
+			return rabbit.Message{}, errors.New("sender didn't send a message")
+		}
+	}
+
+	return rabbit.Message{}, err
 }

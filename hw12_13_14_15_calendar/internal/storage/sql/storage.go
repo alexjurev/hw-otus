@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/rabbit"
 	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/storage"
 	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/util"
 	"github.com/jmoiron/sqlx"
@@ -228,4 +229,15 @@ func (s *Storage) selectByRange(ctx context.Context, startTime time.Time, endTim
 	)
 
 	return events, err
+}
+
+func (s *Storage) AddSenderLog(ctx context.Context, e *rabbit.Message) error {
+	err := s.db.GetContext(
+		ctx,
+		&e.ID,
+		"INSERT INTO Sender_logs(id, name, time, owner_id) "+
+			"VALUES($1, $2, $3, $4) RETURNING id",
+		e.ID, e.Name, e.Time, e.OwnerID)
+
+	return err
 }
