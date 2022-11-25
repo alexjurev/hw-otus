@@ -54,7 +54,10 @@ func main() {
 	}
 
 	r := rabbit.New(config.Rabbit)
-	r.Connect()
+	if err = r.Connect(); err != nil {
+		log.Errorf("failed to connect to the RabbitMQ: %v", err)
+		return
+	}
 	defer r.Close()
 
 	stor, err := storagebuilder.NewStorage(config.Storage)
@@ -71,18 +74,26 @@ func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 	defer cancel()
 
-	startTime := time.Now().Add(-time.Minute)
 	endTime := time.Now()
+	eventLimit := 100
 	checkTicker := time.NewTicker(checkTimout)
 	removeTicker := time.NewTicker(removeTimeout)
+	go func() {
+		for range removeTicker.C {
+			if err := stor.RemoveAfter(ctx, time.Now().Add(-1*(time.Hour*24*365))); err != nil {
+				log.Errorf("failed to remove old events: %s", err)
+				continue
+			}
+		}
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-
-			log.Debugf("get events: %s - %s", startTime, endTime)
-			events, err := stor.GetEventsByNotifier(ctx, startTime, endTime)
+			log.Debugf("get events %s", endTime)
+			events, err := stor.GetEventsByNotifier(ctx, eventLimit, endTime)
 			if err != nil {
 				log.Errorf("failed to get events: %s", err)
 				continue
@@ -90,18 +101,24 @@ func main() {
 			for _, event := range events {
 				log.Debugf("send event: %v", event)
 				m := newMessage(event)
-				data, _ := json.Marshal(m)
+				data, err := json.Marshal(m)
+				if err != nil {
+					log.Errorf("failed to marshal event: %s", err)
+					return
+				}
 				r.Publish(data)
+			}
+			err = stor.MarkSentEvents(ctx, events)
+			if err != nil {
+				log.Errorf("failed to mark sent events: %s", err)
+				continue
 			}
 			select {
 			case <-ctx.Done():
 				return
 			case <-checkTicker.C:
 				log.Debug("ticker")
-				startTime = endTime
 				endTime = time.Now()
-			case <-removeTicker.C:
-				stor.RemoveAfter(ctx, time.Now().Add(-1*(time.Hour*24*365)))
 			}
 		}
 	}
