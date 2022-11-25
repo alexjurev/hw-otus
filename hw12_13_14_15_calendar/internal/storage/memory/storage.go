@@ -181,6 +181,8 @@ func contains(elems []string, v string) bool {
 		}
 	}
 	return false
+}
+
 func (s *Storage) AddSenderLog(_ context.Context, _ *rabbit.Message) error {
 	return nil
 }
