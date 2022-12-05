@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/rabbit"
 	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/storage"
 	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/util"
 )
@@ -180,4 +181,8 @@ func contains(elems []string, v string) bool {
 		}
 	}
 	return false
+}
+
+func (s *Storage) AddSenderLog(_ context.Context, _ *rabbit.Message) error {
+	return nil
 }

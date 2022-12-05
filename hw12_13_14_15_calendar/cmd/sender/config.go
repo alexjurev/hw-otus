@@ -6,14 +6,16 @@ import (
 
 	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/logger"
 	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/rabbit"
+	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/storagebuilder"
 	"github.com/spf13/viper"
 )
 
 const envConfigPrefix = "$env:"
 
 type Config struct {
-	Logger logger.Config
-	Rabbit rabbit.Config
+	Logger  logger.Config
+	Rabbit  rabbit.Config
+	Storage storagebuilder.Config
 }
 
 func NewConfig(configFile string) (Config, error) {

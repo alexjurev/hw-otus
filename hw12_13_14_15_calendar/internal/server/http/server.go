@@ -77,14 +77,12 @@ func (s *Server) AddEvent(w http.ResponseWriter, r *http.Request) {
 
 	err := parseRequestBody(r, &event)
 	if err != nil {
-		w.Write([]byte(err.Error()))
-		w.WriteHeader(http.StatusInternalServerError)
+		returnErr(w, err)
 		return
 	}
 	id, err := s.app.CreateEvent(context.Background(), event)
 	if err != nil {
-		w.Write([]byte(err.Error()))
-		w.WriteHeader(http.StatusInternalServerError)
+		returnErr(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -100,14 +98,12 @@ func (s *Server) UpdateEvent(w http.ResponseWriter, r *http.Request) {
 	updateEvent := UpdateReq{}
 	err := parseRequestBody(r, &updateEvent)
 	if err != nil {
-		w.Write([]byte(err.Error()))
-		w.WriteHeader(http.StatusInternalServerError)
+		returnErr(w, err)
 		return
 	}
 	err = s.app.UpdateEvent(context.Background(), updateEvent.ID, updateEvent.Event)
 	if err != nil {
-		w.Write([]byte(err.Error()))
-		w.WriteHeader(http.StatusInternalServerError)
+		returnErr(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -117,14 +113,12 @@ func (s *Server) RemoveEvent(w http.ResponseWriter, r *http.Request) {
 	event := storage.Event{}
 	err := parseRequestBody(r, &event)
 	if err != nil {
-		w.Write([]byte(err.Error()))
-		w.WriteHeader(http.StatusInternalServerError)
+		returnErr(w, err)
 		return
 	}
 	err = s.app.RemoveEvent(context.Background(), event.ID)
 	if err != nil {
-		w.Write([]byte(err.Error()))
-		w.WriteHeader(http.StatusInternalServerError)
+		returnErr(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -144,8 +138,7 @@ func (s *Server) GetEvents(w http.ResponseWriter, r *http.Request, period string
 	date := ReqDate{}
 	err := parseRequestBody(r, &date)
 	if err != nil {
-		w.Write([]byte(err.Error()))
-		w.WriteHeader(http.StatusInternalServerError)
+		returnErr(w, err)
 		return
 	}
 	var event []storage.Event
@@ -153,22 +146,19 @@ func (s *Server) GetEvents(w http.ResponseWriter, r *http.Request, period string
 	case day:
 		event, err = s.app.GetEventsForDay(context.Background(), date.Date)
 		if err != nil {
-			w.Write([]byte(err.Error()))
-			w.WriteHeader(http.StatusInternalServerError)
+			returnErr(w, err)
 			return
 		}
 	case week:
 		event, err = s.app.GetEventsForWeek(context.Background(), date.Date)
 		if err != nil {
-			w.Write([]byte(err.Error()))
-			w.WriteHeader(http.StatusInternalServerError)
+			returnErr(w, err)
 			return
 		}
 	case month:
 		event, err = s.app.GetEventsForMonth(context.Background(), date.Date)
 		if err != nil {
-			w.Write([]byte(err.Error()))
-			w.WriteHeader(http.StatusInternalServerError)
+			returnErr(w, err)
 			return
 		}
 	default:
@@ -204,4 +194,9 @@ func parseRequestBody(r *http.Request, v interface{}) error {
 	}
 
 	return nil
+}
+
+func returnErr(w http.ResponseWriter, err error) {
+	w.WriteHeader(http.StatusInternalServerError)
+	w.Write([]byte(err.Error()))
 }

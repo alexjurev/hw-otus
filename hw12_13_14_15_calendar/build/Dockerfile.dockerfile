@@ -1,7 +1,9 @@
 # Собираем в гошке
 FROM golang:1.19.1 as build
 
+ENV WAIT_VERSION 2.7.2
 ENV BIN_FILE /opt/calendar/calendar-app
+ENV WAIT_FILE /opt/calendar/wait
 ENV CODE_DIR /go/src/
 
 WORKDIR ${CODE_DIR}
@@ -20,6 +22,9 @@ RUN CGO_ENABLED=0 go build \
         -ldflags "$LDFLAGS" \
         -o ${BIN_FILE} cmd/calendar/*
 
+ADD https://github.com/ufoscout/docker-compose-wait/releases/download/$WAIT_VERSION/wait ${WAIT_FILE}
+RUN chmod +x ${WAIT_FILE}
+
 # На выходе тонкий образ
 FROM alpine:3.9
 
@@ -28,9 +33,11 @@ LABEL SERVICE="calendar"
 LABEL MAINTAINERS="student@otus.ru"
 
 ENV BIN_FILE "/opt/calendar/calendar-app"
+ENV WAIT_FILE /opt/calendar/wait
 COPY --from=build ${BIN_FILE} ${BIN_FILE}
+COPY --from=build ${WAIT_FILE} ${WAIT_FILE}
 
 ENV CONFIG_FILE /etc/calendar/config.yaml
-COPY ./configs/config.yaml ${CONFIG_FILE}
+COPY ./configs/config-docker.yaml ${CONFIG_FILE}
 
-CMD ${BIN_FILE} -config ${CONFIG_FILE}
+CMD ${WAIT_FILE} && ${BIN_FILE} -config ${CONFIG_FILE}

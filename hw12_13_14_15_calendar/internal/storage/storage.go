@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"time"
+
+	"github.com/alexjurev/hw-otus/hw12_13_14_15_calendar/internal/rabbit"
 )
 
 var (
@@ -25,4 +27,5 @@ type Storage interface {
 	GetEventsByNotifier(ctx context.Context, limit int, endTime time.Time) ([]Event, error)
 	RemoveAfter(ctx context.Context, time time.Time) error
 	MarkSentEvents(ctx context.Context, events []Event) error
+	AddSenderLog(ctx context.Context, e *rabbit.Message) error
 }
