@@ -31,8 +31,12 @@ func (s *Storage) Close(_ context.Context) error {
 }
 
 func (s *Storage) AddEvent(_ context.Context, e *storage.Event) error {
-	if err := e.Validate(); err != nil {
-		return err
+	if !e.EndTime.After(e.StartTime) {
+		return fmt.Errorf("start time of the event must be in the future: %w", storage.ErrIncorrectEventTime)
+	}
+
+	if e.StartTime.Before(time.Now()) {
+		return storage.ErrIncorrectEventTime
 	}
 
 	s.mu.Lock()
@@ -99,6 +103,58 @@ func (s *Storage) GetEventsForMonth(_ context.Context, startDate time.Time) ([]s
 	return s.selectByRange(startTime, endTime)
 }
 
+func (s *Storage) GetEventsByNotifier(
+	ctx context.Context,
+	limit int,
+	endTime time.Time,
+) ([]storage.Event, error) {
+	events := make([]storage.Event, 0)
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for _, event := range s.data {
+		notifyTime := event.StartTime.Add(time.Hour * time.Duration(event.NotifyBefore))
+		if event.NotifyBefore > 0 && !event.IsSent && notifyTime.Before(endTime) {
+			events = append(events, event)
+			if len(events) == limit {
+				return events, nil
+			}
+		}
+	}
+
+	return events, nil
+}
+
+func (s *Storage) MarkSentEvents(
+	ctx context.Context,
+	events []storage.Event,
+) error {
+	if len(events) == 0 {
+		return nil
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	ids := make([]string, len(events))
+	for i, e := range events {
+		ids[i] = e.ID
+	}
+	for _, event := range s.data {
+		event.IsSent = contains(ids, event.ID)
+	}
+
+	return nil
+}
+
+func (s *Storage) RemoveAfter(ctx context.Context, time time.Time) error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	for k, event := range s.data {
+		if event.StartTime.After(time) {
+			delete(s.data, k)
+		}
+	}
+	return nil
+}
+
 // Select in range [startTime:endTime).
 func (s *Storage) selectByRange(startTime time.Time, endTime time.Time) ([]storage.Event, error) {
 	events := make([]storage.Event, 0)
@@ -115,4 +171,13 @@ func (s *Storage) selectByRange(startTime time.Time, endTime time.Time) ([]stora
 func (s *Storage) nextID() string {
 	s.idSeq++
 	return strconv.Itoa(s.idSeq)
+}
+
+func contains(elems []string, v string) bool {
+	for _, s := range elems {
+		if v == s {
+			return true
+		}
+	}
+	return false
 }

@@ -1,17 +1,21 @@
 BIN := "./bin/calendar"
+SCHEDULER_BIN := "./bin/calendar_scheduler"
+SENDER_BIN := "./bin/calendar_sender"
 DOCKER_IMG="calendar:develop"
 
 # Postgres - for migrations
 PG_HOST := $(if ${POSTGRES_HOST},${POSTGRES_HOST},127.0.0.1)
 PG_PORT := $(if ${POSTGRES_PORT},${POSTGRES_PORT},5432)
 PG_USER := $(if ${POSTGRES_USERNAME},${POSTGRES_USERNAME},postgres)
-PG_PASS := $(if ${POSTGRES_PASSWORD},${POSTGRES_PASSWORD},pas)
+PG_PASS := $(if ${POSTGRES_PASSWORD},${POSTGRES_PASSWORD},postgres)
 
 GIT_HASH := $(shell git log --format="%h" -n 1)
 LDFLAGS := -X main.release="develop" -X main.buildDate=$(shell date -u +%Y-%m-%dT%H:%M:%S) -X main.gitHash=$(GIT_HASH)
 
 build:
 	go build -v -o $(BIN) -ldflags "$(LDFLAGS)" ./cmd/calendar
+	go build -v -o $(SCHEDULER_BIN) -ldflags "$(LDFLAGS)" ./cmd/scheduler
+	go build -v -o $(SENDER_BIN) -ldflags "$(LDFLAGS)" ./cmd/sender
 
 run: build
 	$(BIN) -config ./configs/config.yaml

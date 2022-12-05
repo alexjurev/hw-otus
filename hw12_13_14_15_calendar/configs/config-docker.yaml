@@ -7,4 +7,4 @@ database:
   port: $env:POSTGRES_PORT
   database: postgres
   username: postgres
-  password: pas
+  password: postgres

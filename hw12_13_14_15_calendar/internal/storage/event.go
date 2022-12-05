@@ -6,13 +6,14 @@ import (
 )
 
 type Event struct {
-	ID           string        `json:"id"`
-	Title        string        `json:"title"`
-	StartTime    time.Time     `json:"startTime"`
-	EndTime      time.Time     `json:"endTime"`
-	Description  string        `json:"description"`
-	OwnerID      string        `json:"ownerId"`
-	NotifyBefore time.Duration `json:"notifyBefore"`
+	ID           string    `json:"id"`
+	Title        string    `json:"title"`
+	IsSent       bool      `json:"isSent"`
+	StartTime    time.Time `json:"startTime"`
+	EndTime      time.Time `json:"endTime"`
+	Description  string    `json:"description"`
+	OwnerID      string    `json:"ownerId"`
+	NotifyBefore int32     `json:"notifyBefore"`
 }
 
 func (e *Event) Validate() error {
